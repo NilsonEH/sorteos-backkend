@@ -1,2 +1,0 @@
-ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winning_ticket INTEGER;
-ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_purchase_id INTEGER;
