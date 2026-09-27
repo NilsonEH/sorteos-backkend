@@ -1,53 +1,53 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-
-const TICKETS_BY_PLAN = { mensual: 1, anual: 3 };
+const { PLANS, findOrCreateCustomer, saveCard, charge } = require('../culqi');
 
 router.post('/checkout', async (req, res) => {
-  const { name, email, plan, culqiToken } = req.body;
-  if (!name || !email || !plan || !culqiToken) {
+  const { firstName, lastName, email, phone, plan, culqiToken } = req.body;
+  if (!firstName || !lastName || !email || !phone || !culqiToken) {
     return res.status(400).json({ error: 'Faltan datos del formulario o el token de pago' });
   }
+  const p = PLANS[plan];
+  if (!p) return res.status(400).json({ error: 'Plan inválido' });
 
-  const amountByPlan = { mensual: 1900, anual: 17900 };
-  const amount = amountByPlan[plan];
-  if (!amount) return res.status(400).json({ error: 'Plan inválido' });
+  const cleanEmail = String(email).trim().toLowerCase();
 
   try {
-    const response = await fetch('https://api.culqi.com/v2/charges', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.CULQI_SECRET_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        amount,
-        currency_code: 'PEN',
-        email,
-        source_id: culqiToken,
-        description: `Suscripción ${plan} - Sorteos`
-      })
-    });
-    const charge = await response.json();
+    const { rows } = await pool.query(`SELECT * FROM subscribers WHERE email = $1`, [cleanEmail]);
+    const existing = rows[0];
 
-    if (!response.ok) {
-      return res.status(402).json({ error: 'Pago rechazado', detail: charge });
+    if (existing && existing.status === 'active' && existing.culqi_card_id) {
+      return res.status(409).json({ error: 'Ya tienes una suscripción activa con este correo' });
     }
 
-    const tickets = TICKETS_BY_PLAN[plan] || 1;
+    const customerId = (existing && existing.culqi_customer_id)
+      || await findOrCreateCustomer({ firstName, lastName, email: cleanEmail, phone });
+    const cardId = await saveCard(customerId, culqiToken);
+    const firstCharge = await charge({
+      amount: p.amount,
+      email: cleanEmail,
+      cardId,
+      description: `Suscripción ${plan} - Sorteos`
+    });
+
     await pool.query(
-      `INSERT INTO subscribers (name, email, plan, tickets)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (email) DO UPDATE
-       SET status = 'active', plan = EXCLUDED.plan, tickets = EXCLUDED.tickets`,
-      [name, email, plan, tickets]
+      `INSERT INTO subscribers
+         (name, email, plan, tickets, phone, culqi_customer_id, culqi_card_id, next_billing_at, failed_attempts, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() + make_interval(months => $8), 0, 'active')
+       ON CONFLICT (email) DO UPDATE SET
+         name = EXCLUDED.name, plan = EXCLUDED.plan, tickets = EXCLUDED.tickets,
+         phone = EXCLUDED.phone, culqi_customer_id = EXCLUDED.culqi_customer_id,
+         culqi_card_id = EXCLUDED.culqi_card_id, next_billing_at = EXCLUDED.next_billing_at,
+         failed_attempts = 0, status = 'active'`,
+      [`${firstName} ${lastName}`.trim(), cleanEmail, plan, p.tickets, phone, customerId, cardId, p.months]
     );
 
-    console.log(`Suscriptor guardado: ${email} (${plan})`);
-    res.status(201).json({ ok: true, chargeId: charge.id });
+    console.log(`Suscriptor guardado: ${cleanEmail} (${plan})`);
+    res.status(201).json({ ok: true, chargeId: firstCharge.id });
   } catch (err) {
-    console.error(err);
+    console.error('Error en checkout:', err.message, err.culqi || '');
+    if (err.culqi) return res.status(402).json({ error: err.message });
     res.status(500).json({ error: 'Error al procesar el pago' });
   }
 });
@@ -55,18 +55,6 @@ router.post('/checkout', async (req, res) => {
 router.post('/webhook', express.json(), async (req, res) => {
   const event = req.body;
   console.log('Evento de Culqi recibido:', event?.type);
-
-  try {
-    if (event?.type === 'charge.refunded' && event?.data?.email) {
-      await pool.query(
-        `UPDATE subscribers SET status = 'cancelled' WHERE email = $1`,
-        [event.data.email]
-      );
-    }
-  } catch (err) {
-    console.error(err);
-  }
-
   res.sendStatus(200);
 });
 
