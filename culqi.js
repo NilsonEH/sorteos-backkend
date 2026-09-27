@@ -6,7 +6,7 @@ const TIERS = [
   { min: 5, price: 200 } // S/ 2.00 por boleto, sin descuentos
 ];
 const MIN_TICKETS = 5;
-const MAX_AMOUNT = 200000; // S/ 2000: límite de Yape por pago en Culqi
+const MAX_AMOUNT = 50000; // S/ 500: límite diario de Yape para compras online
 
 function priceFor(quantity) {
   const tier = TIERS.find(t => quantity >= t.min);
