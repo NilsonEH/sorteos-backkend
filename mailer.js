@@ -63,7 +63,7 @@ async function sendPurchaseEmail({ email, name, quantity, amount, totalThisRound
     subject: `Tus ${quantity} boletos están confirmados`,
     html: layout(`
       <h2 style="color:#742284">¡Gracias por tu compra, ${esc(name)}!</h2>
-      <p>Compraste <b>${quantity} boletos</b> por <b>${soles(amount)}</b> para el sorteo del <b>${draw}</b>.${esc(extra)}</p>
+      <p>Compraste <b>${quantity} boletos</b> por <b>${soles(amount)}</b> para el sorteo del <b>${draw}</b>${esc(extra)}</p>
       <p>¡Mucha suerte!</p>
       <p style="font-size:13px;color:#6b5a8e">Código de pago: ${esc(chargeId)}</p>`),
     text: `¡Gracias por tu compra, ${name}! Compraste ${quantity} boletos por ${soles(amount)} para el sorteo del ${draw}.${extra} Código de pago: ${chargeId}`
