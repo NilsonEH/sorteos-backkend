@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
+const { sendPurchaseEmail } = require('../mailer');
 const { TIERS, MIN_TICKETS, MAX_AMOUNT, priceFor, charge } = require('../culqi');
 
 // Precios públicos para que la landing los muestre
@@ -72,7 +73,9 @@ router.post('/checkout', async (req, res) => {
   } catch (e) {
     console.error('No se pudo calcular el total:', e.message);
   }
-
+// 4) Confirmación por correo (no retrasa la respuesta al comprador)
+  sendPurchaseEmail({ email: cleanEmail, name: firstName, quantity: qty, amount, totalThisRound, chargeId: payment.id })
+    .catch(e => console.error('Correo de compra:', e.message));
   console.log(`Compra: ${cleanEmail} - ${qty} boletos (S/ ${(amount / 100).toFixed(2)})`);
   res.status(201).json({ ok: true, chargeId: payment.id, quantity: qty, totalThisRound });
 });
