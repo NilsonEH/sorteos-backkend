@@ -1,0 +1,10 @@
+# Puerto del servidor
+PORT=3001
+
+# Culqi (pasarela de pago peruana) - reemplaza con tus llaves reales
+CULQI_SECRET_KEY=sk_test_xxxxxxxxxxxx
+CULQI_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
+
+# Alternativa: Stripe, si prefieres cobrar en otras monedas
+# STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
+# STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
