@@ -8,6 +8,7 @@ const { init } = require('./db');
 const subscribersRoutes = require('./routes/subscribers');
 const rafflesRoutes = require('./routes/raffles');
 const paymentsRoutes = require('./routes/payments');
+const billingRoutes = require('./routes/billing');
 
 const app = express();
 app.use(cors());
@@ -33,9 +34,15 @@ app.get('/panel', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'panel.html'));
 });
 
+// Configuración pública para la landing (la llave pública no es secreta)
+app.get('/api/config', (req, res) => {
+  res.json({ culqiPublicKey: process.env.CULQI_PUBLIC_KEY || '' });
+});
+
 // Rutas privadas (solo administrador)
 app.use('/api/subscribers', requireAdmin, subscribersRoutes);
 app.post('/api/raffles/draw', requireAdmin);
+app.use('/api/billing', requireAdmin, billingRoutes);
 
 // Rutas públicas
 app.use('/api/raffles', rafflesRoutes);
