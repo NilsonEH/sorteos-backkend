@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Panel de sorteos</title>
 <style>
-  :root { --bg:#1a1233; --card:#241a45; --line:#3a2d66; --text:#f4f0ff; --muted:#b9aee0; --gold:#f5c542; --coral:#ef6b63; }
+  :root { --bg:#1a1233; --card:#241a45; --line:#3a2d66; --text:#f4f0ff; --muted:#b9aee0; --gold:#f5c542; --coral:#ef6b63; --green:#25d366; }
   * { box-sizing:border-box; }
   body { margin:0; font-family:system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); padding:20px 16px 40px; }
   .wrap { max-width:560px; margin:0 auto; }
@@ -17,15 +17,16 @@
   button { width:100%; padding:14px; border:0; border-radius:12px; background:var(--coral); color:#1a1233; font-weight:700; font-size:16px; }
   button.secondary { background:transparent; color:var(--muted); border:1px solid var(--line); }
   button:disabled { opacity:.5; }
-  .stats { display:flex; gap:10px; }
-  .stat { flex:1; background:#130d27; border-radius:12px; padding:12px; text-align:center; }
-  .stat b { display:block; font-size:24px; color:var(--gold); }
+  .stats { display:flex; gap:8px; margin-top:10px; }
+  .stat { flex:1; background:#130d27; border-radius:12px; padding:12px 6px; text-align:center; }
+  .stat b { display:block; font-size:22px; color:var(--gold); }
   .row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
   .row:last-child { border-bottom:0; }
   .row small { color:var(--muted); display:block; word-break:break-all; }
-  .x { width:auto; padding:6px 10px; font-size:13px; background:transparent; color:var(--coral); border:1px solid var(--coral); }
+  .pill { background:#130d27; color:var(--gold); border-radius:999px; padding:4px 10px; font-weight:700; white-space:nowrap; }
   .winner { text-align:center; padding:16px; border:2px solid var(--gold); border-radius:16px; margin-top:12px; }
   .winner b { color:var(--gold); font-size:22px; display:block; margin:6px 0; }
+  .wa { display:inline-block; margin-top:12px; background:var(--green); color:#0b2e17; font-weight:700; padding:12px 18px; border-radius:12px; text-decoration:none; }
   .error { color:var(--coral); font-size:14px; min-height:18px; margin:0 0 8px; }
   .hidden { display:none; }
 </style>
@@ -44,14 +45,16 @@
 
   <div id="app" class="hidden">
     <div class="card">
+      <p class="muted" id="nextDraw"></p>
       <div class="stats">
-        <div class="stat"><b id="statSubs">0</b><span class="muted">Suscriptores</span></div>
+        <div class="stat"><b id="statPeople">0</b><span class="muted">Participantes</span></div>
         <div class="stat"><b id="statTickets">0</b><span class="muted">Boletos</span></div>
+        <div class="stat"><b id="statAmount">S/ 0</b><span class="muted">Recaudado</span></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Nuevo sorteo</h2>
+      <h2>Realizar sorteo</h2>
       <input id="prizeInput" placeholder="Premio (ej. Audífonos Bluetooth)">
       <p id="drawError" class="error"></p>
       <button id="drawBtn">Sortear ahora</button>
@@ -59,8 +62,8 @@
     </div>
 
     <div class="card">
-      <h2>Suscriptores activos</h2>
-      <div id="subsList" class="muted">Cargando...</div>
+      <h2>Participantes del próximo sorteo</h2>
+      <div id="peopleList" class="muted">Cargando...</div>
     </div>
 
     <div class="card">
@@ -69,128 +72,125 @@
     </div>
 
     <div class="card">
+      <button id="refreshBtn" class="secondary">Actualizar</button>
+      <div style="height:10px"></div>
       <button id="logoutBtn" class="secondary">Cerrar sesión</button>
     </div>
   </div>
 </div>
 
 <script>
-let adminKey = sessionStorage.getItem('adminKey') || '';
-let subsCache = [];
+(() => {
+  let adminKey = sessionStorage.getItem('adminKey') || '';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fecha = d => d ? new Date(d).toLocaleString('es-PE', { dateStyle:'medium', timeStyle:'short' }) : '';
+  const soles = c => 'S/ ' + (c / 100).toFixed(2);
+  const waLink = (phone, text) => 'https://wa.me/51' + String(phone || '').replace(/\D/g, '') + '?text=' + encodeURIComponent(text);
 
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fecha = d => d ? new Date(d).toLocaleString('es-PE', { dateStyle:'medium', timeStyle:'short' }) : '';
+  (function showNextDraw() {
+    const lima = new Date(Date.now() - 5 * 3600e3);
+    let add = (6 - lima.getUTCDay() + 7) % 7;
+    if (add === 0 && lima.getUTCHours() >= 20) add = 7;
+    const d = new Date(Date.UTC(lima.getUTCFullYear(), lima.getUTCMonth(), lima.getUTCDate() + add));
+    $('nextDraw').textContent = 'Próximo sorteo: sábado ' + d.getUTCDate() + '/' + (d.getUTCMonth() + 1) + ', 8:00 p.m.';
+  })();
 
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey }
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || 'Error');
-    err.status = res.status;
-    throw err;
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { const err = new Error(data.error || 'Error'); err.status = res.status; throw err; }
+    return data;
   }
-  return data;
-}
 
-async function login() {
-  adminKey = $('keyInput').value.trim();
-  $('loginError').textContent = '';
-  $('loginBtn').disabled = true;
-  $('loginBtn').textContent = 'Verificando...';
-  try {
-    await loadSubs();
-    sessionStorage.setItem('adminKey', adminKey);
-    $('login').classList.add('hidden');
-    $('app').classList.remove('hidden');
-    loadHistory();
-  } catch (e) {
-    sessionStorage.removeItem('adminKey');
-    $('loginError').textContent = e.status === 401
-      ? 'Clave incorrecta'
-      : 'No se pudo conectar. Espera un minuto e intenta de nuevo.';
-  } finally {
-    $('loginBtn').disabled = false;
-    $('loginBtn').textContent = 'Entrar';
+  async function login() {
+    adminKey = $('keyInput').value.trim();
+    $('loginError').textContent = '';
+    $('loginBtn').disabled = true;
+    $('loginBtn').textContent = 'Verificando...';
+    try {
+      await loadPeople();
+      sessionStorage.setItem('adminKey', adminKey);
+      $('login').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      loadHistory();
+    } catch (e) {
+      sessionStorage.removeItem('adminKey');
+      $('loginError').textContent = e.status === 401 ? 'Clave incorrecta' : 'No se pudo conectar. Espera un minuto e intenta de nuevo.';
+    } finally {
+      $('loginBtn').disabled = false;
+      $('loginBtn').textContent = 'Entrar';
+    }
   }
-}
 
-async function loadSubs() {
-  subsCache = await api('/api/subscribers');
-  $('statSubs').textContent = subsCache.length;
-  $('statTickets').textContent = subsCache.reduce((t, s) => t + s.tickets, 0);
-  $('subsList').innerHTML = subsCache.length
-    ? subsCache.map(s => `
-      <div class="row">
-        <div><b>${esc(s.name)}</b><small>${esc(s.email)} · ${esc(s.plan)} · ${s.tickets} boleto(s)</small></div>
-        <button class="x" data-id="${Number(s.id)}">Dar de baja</button>
-      </div>`).join('')
-    : 'Aún no hay suscriptores.';
-}
-
-async function loadHistory() {
-  try {
-    const rows = await api('/api/raffles');
-    $('historyList').innerHTML = rows.length
-      ? rows.map(r => `
+  async function loadPeople() {
+    const rows = await api('/api/subscribers');
+    $('statPeople').textContent = rows.length;
+    $('statTickets').textContent = rows.reduce((t, p) => t + p.tickets, 0);
+    $('statAmount').textContent = soles(rows.reduce((t, p) => t + p.amount, 0));
+    $('peopleList').innerHTML = rows.length
+      ? rows.map(p => `
         <div class="row">
-          <div><b>${esc(r.prize)}</b><small>${esc(r.winner_name || 'Sin ganador')} · ${fecha(r.drawn_at)}</small></div>
+          <div><b>${esc(p.name)}</b><small>${esc(p.phone)} · ${esc(p.email)}</small></div>
+          <span class="pill">${p.tickets} 🎟️</span>
         </div>`).join('')
-      : 'Aún no hay sorteos.';
-  } catch {
-    $('historyList').textContent = 'No se pudo cargar el historial.';
+      : 'Aún no hay boletos vendidos para este sorteo.';
   }
-}
 
-async function draw() {
-  const prize = $('prizeInput').value.trim();
-  $('drawError').textContent = '';
-  if (!prize) { $('drawError').textContent = 'Escribe el premio primero'; return; }
-  if (!confirm(`¿Sortear "${prize}" ahora? El resultado quedará registrado.`)) return;
-  $('drawBtn').disabled = true;
-  $('drawBtn').textContent = 'Sorteando...';
-  try {
-    const r = await api('/api/raffles/draw', { method: 'POST', body: JSON.stringify({ prize }) });
-    $('winnerBox').innerHTML = `
-      <div class="winner">
-        <span class="muted">Ganador de ${esc(r.prize)}</span>
-        <b>${esc(r.winner.name)}</b>
-        <span class="muted">${esc(r.winner.email)} · plan ${esc(r.winner.plan)}</span>
-      </div>`;
-    $('prizeInput').value = '';
-    loadHistory();
-  } catch (e) {
-    $('drawError').textContent = e.message;
-  } finally {
-    $('drawBtn').disabled = false;
-    $('drawBtn').textContent = 'Sortear ahora';
+  async function loadHistory() {
+    try {
+      const rows = await api('/api/raffles');
+      $('historyList').innerHTML = rows.length
+        ? rows.map(r => `
+          <div class="row">
+            <div><b>${esc(r.prize)}</b><small>${esc(r.winner_name || 'Sin ganador')} · ${r.total_tickets ? r.total_tickets + ' boletos · ' : ''}${fecha(r.drawn_at)}</small></div>
+          </div>`).join('')
+        : 'Aún no hay sorteos.';
+    } catch {
+      $('historyList').textContent = 'No se pudo cargar el historial.';
+    }
   }
-}
 
-async function cancelSub(id) {
-  const s = subsCache.find(x => x.id === id);
-  if (!confirm(`¿Dar de baja a ${s ? s.name : 'este suscriptor'}? Ya no participará en los sorteos.`)) return;
-  try {
-    await api(`/api/subscribers/${id}`, { method: 'DELETE' });
-    await loadSubs();
-  } catch (e) {
-    alert('No se pudo dar de baja: ' + e.message);
+  async function draw() {
+    const prize = $('prizeInput').value.trim();
+    $('drawError').textContent = '';
+    if (!prize) { $('drawError').textContent = 'Escribe el premio primero'; return; }
+    if (!confirm(`¿Sortear "${prize}" ahora? Los boletos de esta semana se cerrarán y el resultado quedará registrado.`)) return;
+    $('drawBtn').disabled = true;
+    $('drawBtn').textContent = 'Sorteando...';
+    try {
+      const r = await api('/api/raffles/draw', { method: 'POST', body: JSON.stringify({ prize }) });
+      const msg = `¡Hola ${r.winner.name}! 🎉 Ganaste "${r.prize}" en nuestro sorteo semanal. Te escribimos para coordinar la entrega de tu premio.`;
+      $('winnerBox').innerHTML = `
+        <div class="winner">
+          <span class="muted">Ganador de ${esc(r.prize)}</span>
+          <b>${esc(r.winner.name)}</b>
+          <span class="muted">${r.winner.tickets} de ${r.totalTickets} boletos · ${r.participants} participantes</span><br>
+          <span class="muted">${esc(r.winner.phone)} · ${esc(r.winner.email)}</span><br>
+          <a class="wa" href="${esc(waLink(r.winner.phone, msg))}" target="_blank" rel="noopener">Avisar por WhatsApp</a>
+        </div>`;
+      $('prizeInput').value = '';
+      loadPeople();
+      loadHistory();
+    } catch (e) {
+      $('drawError').textContent = e.message;
+    } finally {
+      $('drawBtn').disabled = false;
+      $('drawBtn').textContent = 'Sortear ahora';
+    }
   }
-}
 
-$('loginBtn').addEventListener('click', login);
-$('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-$('drawBtn').addEventListener('click', draw);
-$('logoutBtn').addEventListener('click', () => { sessionStorage.removeItem('adminKey'); location.reload(); });
-$('subsList').addEventListener('click', e => {
-  const id = e.target.dataset.id;
-  if (id) cancelSub(Number(id));
-});
+  $('loginBtn').addEventListener('click', login);
+  $('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+  $('drawBtn').addEventListener('click', draw);
+  $('refreshBtn').addEventListener('click', () => { loadPeople().catch(() => {}); loadHistory(); });
+  $('logoutBtn').addEventListener('click', () => { sessionStorage.removeItem('adminKey'); location.reload(); });
 
-if (adminKey) { $('keyInput').value = adminKey; login(); }
+  if (adminKey) { $('keyInput').value = adminKey; login(); }
+})();
 </script>
 </body>
 </html>
