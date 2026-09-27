@@ -23,6 +23,12 @@ async function init() {
       drawn_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS culqi_customer_id TEXT;
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS culqi_card_id TEXT;
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS next_billing_at TIMESTAMPTZ;
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS failed_attempts INTEGER NOT NULL DEFAULT 0;
   `);
 }
 
