@@ -29,6 +29,25 @@ async function init() {
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS culqi_card_id TEXT;
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS next_billing_at TIMESTAMPTZ;
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS failed_attempts INTEGER NOT NULL DEFAULT 0;
+
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_name TEXT;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_email TEXT;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_phone TEXT;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS total_tickets INTEGER;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS participants INTEGER;
+
+    -- Cada compra de boletos. raffle_id vacío = participa en el próximo sorteo.
+    CREATE TABLE IF NOT EXISTS purchases (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      quantity INTEGER NOT NULL,
+      amount INTEGER NOT NULL,
+      charge_id TEXT,
+      raffle_id INTEGER REFERENCES raffles(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 }
 
