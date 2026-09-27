@@ -8,15 +8,22 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const soles = c => 'S/ ' + (c / 100).toFixed(2);
 
-// Próximo sábado 8:00 p.m. (hora de Lima), igual que en la landing
+// Sorteo cada 30 días a las 2:00 p.m. (hora de Lima), contando desde FIRST_DRAW_DATE (AAAA-MM-DD)
 function nextDrawText() {
-  const lima = new Date(Date.now() - 5 * 3600e3);
-  let add = (6 - lima.getUTCDay() + 7) % 7;
-  if (add === 0 && lima.getUTCHours() >= 20) add = 7;
-  const d = new Date(Date.UTC(lima.getUTCFullYear(), lima.getUTCMonth(), lima.getUTCDate() + add));
-  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
-  return `sábado ${d.getUTCDate()} de ${meses[d.getUTCMonth()]}, 8:00 p.m.`;
+  const inicio = process.env.FIRST_DRAW_DATE;
+  if (!inicio) return 'la próxima fecha que anunciaremos';
+  const [y, m, d] = inicio.split('-').map(Number);
+  const ciclo = 30 * 24 * 60 * 60 * 1000;
+  let fecha = Date.UTC(y, m - 1, d, 19, 0, 0); // 2:00 p.m. Lima = 19:00 UTC
+  const ahora = Date.now();
+  if (ahora >= fecha) fecha += (Math.floor((ahora - fecha) / ciclo) + 1) * ciclo;
+  const f = new Date(fecha - 5 * 60 * 60 * 1000);
+  const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+    'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${dias[f.getUTCDay()]} ${f.getUTCDate()} de ${meses[f.getUTCMonth()]}, 2:00 p.m.`;
 }
+
 
 const layout = body => `
 <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#1c1238">
