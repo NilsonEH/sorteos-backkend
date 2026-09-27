@@ -89,4 +89,4 @@ async function sendWinnerEmail({ email, name, prize, tickets, totalTickets }) {
   });
 }
 
-module.exports = { sendPurchaseEmail, sendWinnerEmail };
+module.exports = { sendPurchaseEmail, sendWinnerEmail, nextDrawText };
