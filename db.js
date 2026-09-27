@@ -48,6 +48,7 @@ async function init() {
       raffle_id INTEGER REFERENCES raffles(id),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS purchases_charge_id_key ON purchases (charge_id);
   `);
 }
 
