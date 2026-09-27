@@ -35,6 +35,8 @@ async function init() {
     ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_phone TEXT;
     ALTER TABLE raffles ADD COLUMN IF NOT EXISTS total_tickets INTEGER;
     ALTER TABLE raffles ADD COLUMN IF NOT EXISTS participants INTEGER;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winning_ticket INTEGER;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_purchase_id INTEGER;
 
     -- Cada compra de boletos. raffle_id vacío = participa en el próximo sorteo.
     CREATE TABLE IF NOT EXISTS purchases (
