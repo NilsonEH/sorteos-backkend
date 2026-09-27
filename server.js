@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const { init } = require('./db');
 
 const subscribersRoutes = require('./routes/subscribers');
@@ -11,7 +12,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/subscribers', subscribersRoutes);
+// Solo deja pasar a quien tenga la clave de administrador
+function requireAdmin(req, res, next) {
+  const expected = process.env.ADMIN_KEY;
+  if (!expected) {
+    return res.status(500).json({ error: 'ADMIN_KEY no configurada' });
+  }
+  const given = req.get('x-admin-key') || req.query.key || '';
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  next();
+}
+
+// Rutas privadas (solo administrador)
+app.use('/api/subscribers', requireAdmin, subscribersRoutes);
+app.post('/api/raffles/draw', requireAdmin);
+
+// Rutas públicas
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/payments', paymentsRoutes);
 
