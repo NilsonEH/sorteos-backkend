@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { pool } = require('../db');
+const { sendWinnerEmail } = require('../mailer');
 
 // Historial de sorteos (público)
 router.get('/', async (req, res) => {
@@ -66,7 +67,8 @@ router.post('/draw', async (req, res) => {
     // Cierra la ronda: estos boletos ya se usaron
     await client.query(`UPDATE purchases SET raffle_id = $1 WHERE id = ANY($2)`, [raffleId, ids]);
     await client.query('COMMIT');
-
+sendWinnerEmail({ email: winner.email, name: winner.name, prize, tickets: winner.tickets, totalTickets: total })
+      .catch(e => console.error('Correo al ganador:', e.message));
     res.status(201).json({
       raffleId,
       prize,
