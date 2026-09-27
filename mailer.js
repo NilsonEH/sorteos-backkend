@@ -11,7 +11,7 @@ const soles = c => 'S/ ' + (c / 100).toFixed(2);
 // Sorteo cada 30 días a las 2:00 p.m. (hora de Lima), contando desde FIRST_DRAW_DATE (AAAA-MM-DD)
 function nextDrawText() {
   const inicio = process.env.FIRST_DRAW_DATE;
-  if (!inicio) return 'la próxima fecha que anunciaremos';
+  if (!inicio) return 'próximo mes';
   const [y, m, d] = inicio.split('-').map(Number);
   const ciclo = 30 * 24 * 60 * 60 * 1000;
   let fecha = Date.UTC(y, m - 1, d, 19, 0, 0); // 2:00 p.m. Lima = 19:00 UTC
@@ -73,7 +73,7 @@ async function sendPurchaseEmail({ email, name, quantity, amount, totalThisRound
       <p>Compraste <b>${quantity} boletos</b> por <b>${soles(amount)}</b> para el sorteo del <b>${draw}</b>${esc(extra)}</p>
       <p>¡Mucha suerte!</p>
       <p style="font-size:13px;color:#6b5a8e">Código de pago: ${esc(chargeId)}</p>`),
-    text: `¡Gracias por tu compra, ${name}! Compraste ${quantity} boletos por ${soles(amount)} para el sorteo del ${draw}.${extra} Código de pago: ${chargeId}`
+    text: `¡Gracias por tu compra, ${name}! Compraste ${quantity} boletos por ${soles(amount)} para el sorteo del ${draw}${extra} Código de pago: ${chargeId}`
   });
 }
 
