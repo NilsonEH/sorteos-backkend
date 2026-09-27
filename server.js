@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const path = require('path');
 const { init } = require('./db');
 
 const subscribersRoutes = require('./routes/subscribers');
@@ -26,6 +27,11 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// Panel de administración
+app.get('/panel', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'panel.html'));
+});
 
 // Rutas privadas (solo administrador)
 app.use('/api/subscribers', requireAdmin, subscribersRoutes);
