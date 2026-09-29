@@ -51,6 +51,38 @@ async function init() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE UNIQUE INDEX IF NOT EXISTS purchases_charge_id_key ON purchases (charge_id);
+
+    -- Sorteos gratis: cada persona se inscribe una sola vez y participa en todos
+    CREATE TABLE IF NOT EXISTS entries (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      instagram TEXT,
+      consent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS entries_email_key ON entries (LOWER(email));
+    CREATE UNIQUE INDEX IF NOT EXISTS entries_phone_key ON entries (phone);
+
+    -- Premios anunciados. status: pending (por sortear), drawn (sorteado), removed (quitado)
+    CREATE TABLE IF NOT EXISTS prizes (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      image_url TEXT,
+      position INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      raffle_id INTEGER REFERENCES raffles(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS kind TEXT;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS event_date DATE;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_entry_id INTEGER;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_instagram TEXT;
+    ALTER TABLE entries ADD COLUMN IF NOT EXISTS birth_date DATE;
+    ALTER TABLE entries ADD COLUMN IF NOT EXISTS tiktok TEXT;
+    ALTER TABLE raffles ADD COLUMN IF NOT EXISTS winner_tiktok TEXT;
   `);
 }
 
