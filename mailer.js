@@ -97,32 +97,46 @@ async function sendWinnerEmail({ email, name, prize, tickets, totalTickets }) {
   });
 }
 
+// Fecha de hoy en Lima, por ejemplo "jueves 1 de octubre"
+function todayText() {
+  const f = new Date(Date.now() - 5 * 60 * 60 * 1000);
+  const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+    'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${dias[f.getUTCDay()]} ${f.getUTCDate()} de ${meses[f.getUTCMonth()]}`;
+}
+
+const contactsTip = `<p style="font-size:13px;color:#6b5a8e">Para que nuestros avisos no lleguen a Spam, agrega <b>${FROM}</b> a tus contactos.</p>`;
+
 // Sorteos gratis: confirmación de inscripción
 async function sendEntryEmail({ email, name }) {
   const draw = nextDrawText();
   return send({
     to: email, name,
-    subject: '¡Ya estás participando en los sorteos de Nada es Fake!',
+    subject: 'Nada es Fake: tu inscripción está confirmada',
     html: layout(`
-      <h2 style="color:#742284">¡Listo, ${esc(name)}!</h2>
+      <h2 style="color:#742284">Hola, ${esc(name)}</h2>
       <p>Tu inscripción está confirmada. Te inscribiste <b>una sola vez</b> y ya participas en <b>todos</b> nuestros sorteos gratis.</p>
       <p>Próximo sorteo en vivo: <b>${draw}</b>.</p>
-      <p>Si ganas, te avisamos por este correo y por WhatsApp. ¡Mucha suerte!</p>`),
-    text: `¡Listo, ${name}! Tu inscripción está confirmada y ya participas en todos nuestros sorteos gratis. Próximo sorteo en vivo: ${draw}. Si ganas, te avisamos por este correo y por WhatsApp.`
+      <p>Si sales elegido, te avisamos por este correo y por WhatsApp. ¡Mucha suerte!</p>
+      ${contactsTip}`),
+    text: `Hola, ${name}. Tu inscripción está confirmada y ya participas en todos nuestros sorteos gratis. Próximo sorteo en vivo: ${draw}. Si sales elegido, te avisamos por este correo y por WhatsApp. Para que nuestros avisos no lleguen a Spam, agrega ${FROM} a tus contactos.`
   });
 }
 
-// Sorteos gratis: aviso al ganador
+// Sorteos gratis: aviso al ganador (asunto sobrio para que no caiga en Spam)
 async function sendFreeWinnerEmail({ email, name, prize }) {
+  const hoy = todayText();
   return send({
     to: email, name,
-    subject: `¡Ganaste: ${prize}!`,
+    subject: `Nada es Fake: resultado del sorteo del ${hoy}`,
     html: layout(`
-      <h2 style="color:#742284">¡Felicidades, ${esc(name)}!</h2>
-      <p>Ganaste <b>${esc(prize)}</b> en el sorteo en vivo de Nada es Fake.</p>
+      <h2 style="color:#742284">Hola, ${esc(name)}</h2>
+      <p>En el sorteo en vivo de hoy, ${hoy}, saliste elegido para el premio: <b>${esc(prize)}</b>. ¡Felicidades!</p>
       <p>Te escribiremos por WhatsApp al número que registraste para coordinar la entrega en Cusco.
-      Tienes <b>15 días</b> para reclamar tu premio. La entrega es personal y debes mostrar tu DNI.</p>`),
-    text: `¡Felicidades, ${name}! Ganaste ${prize} en el sorteo en vivo de Nada es Fake. Te escribiremos por WhatsApp para coordinar la entrega en Cusco. Tienes 15 días para reclamar tu premio; la entrega es personal y debes mostrar tu DNI.`
+      Tienes <b>15 días</b> para reclamar tu premio. La entrega es personal y debes mostrar tu DNI.</p>
+      ${contactsTip}`),
+    text: `Hola, ${name}. En el sorteo en vivo de hoy, ${hoy}, saliste elegido para el premio: ${prize}. Te escribiremos por WhatsApp para coordinar la entrega en Cusco. Tienes 15 días para reclamar tu premio; la entrega es personal y debes mostrar tu DNI.`
   });
 }
 
