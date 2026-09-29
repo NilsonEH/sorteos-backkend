@@ -8,22 +8,30 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const soles = c => 'S/ ' + (c / 100).toFixed(2);
 
-// Sorteo cada 30 días a las 2:00 p.m. (hora de Lima), contando desde FIRST_DRAW_DATE (AAAA-MM-DD)
+// Próximo sorteo en hora de Lima (UTC-5, sin horario de verano).
+// DRAW_DAYS: días de la semana separados por coma (0 = domingo, 1 = lunes ... 4 = jueves). Por defecto: lunes y jueves.
+// DRAW_TIME: hora en formato 24 h. Por defecto: 14:00.
+function nextDrawDate(now = Date.now()) {
+  const days = (process.env.DRAW_DAYS || '1,4').split(',').map(n => parseInt(n, 10)).filter(n => n >= 0 && n <= 6);
+  const [hh, mm] = (process.env.DRAW_TIME || '14:00').split(':').map(n => parseInt(n, 10) || 0);
+  const limaNow = new Date(now - 5 * 60 * 60 * 1000);
+  for (let add = 0; add <= 7; add++) {
+    const d = new Date(Date.UTC(limaNow.getUTCFullYear(), limaNow.getUTCMonth(), limaNow.getUTCDate() + add, hh, mm));
+    if (days.includes(d.getUTCDay()) && d.getTime() > limaNow.getTime()) return d;
+  }
+  return null;
+}
+
 function nextDrawText() {
-  const inicio = process.env.FIRST_DRAW_DATE;
-  if (!inicio) return 'próximo mes';
-  const [y, m, d] = inicio.split('-').map(Number);
-  const ciclo = 30 * 24 * 60 * 60 * 1000;
-  let fecha = Date.UTC(y, m - 1, d, 19, 0, 0); // 2:00 p.m. Lima = 19:00 UTC
-  const ahora = Date.now();
-  if (ahora >= fecha) fecha += (Math.floor((ahora - fecha) / ciclo) + 1) * ciclo;
-  const f = new Date(fecha - 5 * 60 * 60 * 1000);
+  const f = nextDrawDate();
+  if (!f) return 'próximo sorteo';
   const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
     'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  return `${dias[f.getUTCDay()]} ${f.getUTCDate()} de ${meses[f.getUTCMonth()]}, 2:00 p.m.`;
+  const h = f.getUTCHours(), m = f.getUTCMinutes();
+  const hora = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a.m.' : 'p.m.'}`;
+  return `${dias[f.getUTCDay()]} ${f.getUTCDate()} de ${meses[f.getUTCMonth()]}, ${hora}`;
 }
-
 
 const layout = body => `
 <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#1c1238">
@@ -89,4 +97,33 @@ async function sendWinnerEmail({ email, name, prize, tickets, totalTickets }) {
   });
 }
 
-module.exports = { sendPurchaseEmail, sendWinnerEmail, nextDrawText };
+// Sorteos gratis: confirmación de inscripción
+async function sendEntryEmail({ email, name }) {
+  const draw = nextDrawText();
+  return send({
+    to: email, name,
+    subject: '¡Ya estás participando en los sorteos de Nada es Fake!',
+    html: layout(`
+      <h2 style="color:#742284">¡Listo, ${esc(name)}!</h2>
+      <p>Tu inscripción está confirmada. Te inscribiste <b>una sola vez</b> y ya participas en <b>todos</b> nuestros sorteos gratis.</p>
+      <p>Próximo sorteo en vivo: <b>${draw}</b>.</p>
+      <p>Si ganas, te avisamos por este correo y por WhatsApp. ¡Mucha suerte!</p>`),
+    text: `¡Listo, ${name}! Tu inscripción está confirmada y ya participas en todos nuestros sorteos gratis. Próximo sorteo en vivo: ${draw}. Si ganas, te avisamos por este correo y por WhatsApp.`
+  });
+}
+
+// Sorteos gratis: aviso al ganador
+async function sendFreeWinnerEmail({ email, name, prize }) {
+  return send({
+    to: email, name,
+    subject: `¡Ganaste: ${prize}!`,
+    html: layout(`
+      <h2 style="color:#742284">¡Felicidades, ${esc(name)}!</h2>
+      <p>Ganaste <b>${esc(prize)}</b> en el sorteo en vivo de Nada es Fake.</p>
+      <p>Te escribiremos por WhatsApp al número que registraste para coordinar la entrega en Cusco.
+      Tienes <b>15 días</b> para reclamar tu premio. La entrega es personal y debes mostrar tu DNI.</p>`),
+    text: `¡Felicidades, ${name}! Ganaste ${prize} en el sorteo en vivo de Nada es Fake. Te escribiremos por WhatsApp para coordinar la entrega en Cusco. Tienes 15 días para reclamar tu premio; la entrega es personal y debes mostrar tu DNI.`
+  });
+}
+
+module.exports = { sendPurchaseEmail, sendWinnerEmail, sendEntryEmail, sendFreeWinnerEmail, nextDrawText };
