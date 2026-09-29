@@ -10,8 +10,10 @@ const subscribersRoutes = require('./routes/subscribers');
 const rafflesRoutes = require('./routes/raffles');
 const paymentsRoutes = require('./routes/payments');
 const billingRoutes = require('./routes/billing');
+const freeRoutes = require('./routes/free');
 
 const app = express();
+app.set('trust proxy', 1); // Render está detrás de un proxy: así se ve la IP real del visitante
 app.use(cors());
 app.use(express.json());
 
@@ -35,19 +37,35 @@ app.get('/panel', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'panel.html'));
 });
 
+// Panel de sorteos gratis
+app.get('/admin-sorteos', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin-sorteos.html'));
+});
+
+// Fotos de los premios (sube los archivos a la carpeta public/premios del repositorio)
+app.use('/premios', express.static(path.join(__dirname, 'public', 'premios'), { maxAge: '1d' }));
+
 // Configuración pública para la landing (la llave pública no es secreta)
 app.get('/api/config', (req, res) => {
- res.json({ culqiPublicKey: process.env.CULQI_PUBLIC_KEY || '', nextDraw: nextDrawText() }); 
+  res.json({
+    culqiPublicKey: process.env.CULQI_PUBLIC_KEY || '',
+    nextDraw: nextDrawText(),
+    instagram: process.env.INSTAGRAM_USER || '',
+    tiktok: process.env.TIKTOK_USER || '',
+    facebook: process.env.FACEBOOK_USER || ''
+  });
 });
 
 // Rutas privadas (solo administrador)
 app.use('/api/subscribers', requireAdmin, subscribersRoutes);
 app.post('/api/raffles/draw', requireAdmin);
 app.use('/api/billing', requireAdmin, billingRoutes);
+app.use('/api/free/admin', requireAdmin);
 
 // Rutas públicas
 app.use('/api/raffles', rafflesRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/free', freeRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
