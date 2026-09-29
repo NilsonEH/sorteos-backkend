@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Panel de sorteos · Nada es Fake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #1c1238; --plum: #2a1d52; --line: #43357a; --ink: #f6f2ff;
+    --soft: #bdb2e6; --gold: #f5c542; --coral: #ef6b63; --paper: #fff8e6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--night); color: var(--ink);
+    font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 16px; line-height: 1.45;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(40px, env(safe-area-inset-bottom));
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1, h2, .big { font-family: 'Fredoka', system-ui, sans-serif; }
+  h1 { color: var(--gold); font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 28px 0 10px; }
+  p.muted { color: var(--soft); margin: 0 0 16px; }
+  .panel { background: var(--plum); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  label { display: block; color: var(--soft); font-size: 14px; margin-bottom: 12px; }
+  input {
+    display: block; width: 100%; margin-top: 5px; padding: 12px; font: inherit; color: var(--ink);
+    background: #150d2c; border: 1px solid var(--line); border-radius: 10px;
+  }
+  input:focus { outline: none; border-color: var(--gold); }
+  button {
+    font: inherit; font-weight: 600; border-radius: 10px; padding: 11px 16px; cursor: pointer;
+    border: 1px solid var(--line); background: #150d2c; color: var(--ink);
+  }
+  button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  button.primary { background: var(--gold); color: var(--night); border-color: var(--gold); }
+  button.draw { background: var(--coral); border-color: var(--coral); color: #fff; }
+  button:disabled { opacity: .5; cursor: progress; }
+  .stats { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .stats .big { font-size: 40px; color: var(--gold); line-height: 1; }
+  .row2 { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+  .prize { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .prize:last-child { border-bottom: 0; }
+  .prize img, .prize .noimg { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: #150d2c; }
+  .prize .noimg { display: grid; place-items: center; font-size: 26px; }
+  .prize b { display: block; }
+  .prize small { color: var(--soft); }
+  .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .contact { margin-top: 6px; font-size: 14px; color: var(--soft); display: none; }
+  .contact.show { display: block; }
+  .msg { min-height: 1.3em; color: #ffb4ae; margin: 8px 0 0; }
+  .ok { color: #a8f0c6; }
+  .hint { font-size: 13px; color: var(--soft); margin: -6px 0 12px; }
+
+  /* Pantalla del sorteo (para la transmisión) */
+  .stage {
+    position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; background: radial-gradient(120% 80% at 50% 20%, #3a2570 0%, var(--night) 70%);
+    z-index: 10;
+  }
+  .stage.show { display: flex; }
+  .stage .prize-name { font-family: 'Fredoka', sans-serif; font-size: clamp(24px, 6vw, 40px); color: var(--soft); margin: 0 0 18px; }
+  .stage .spinner { font-family: 'Fredoka', sans-serif; font-size: clamp(56px, 18vw, 140px); color: var(--gold); line-height: 1; min-height: 1.1em; }
+  .stage .winner { font-family: 'Fredoka', sans-serif; font-size: clamp(40px, 11vw, 88px); color: var(--paper); margin: 10px 0; }
+  .stage .meta { color: var(--soft); margin: 0 0 22px; }
+  .stage .ticket {
+    display: inline-block; background: var(--paper); color: var(--night); border: 2px dashed var(--coral);
+    border-radius: 12px; padding: 8px 18px; font-weight: 600; transform: rotate(-2deg); margin-bottom: 18px;
+  }
+  .stage .private { color: var(--soft); font-size: 15px; margin-top: 12px; display: none; }
+  .stage .private.show { display: block; }
+  .hidden { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .spinner { transition: none; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Panel de sorteos</h1>
+  <p class="muted">Sorteos gratis de Nada es Fake</p>
+
+  <section id="login" class="panel hidden">
+    <label>Clave de administrador
+      <input id="key" type="password" autocomplete="current-password">
+    </label>
+    <button class="primary" id="enter">Entrar</button>
+    <p class="msg" id="loginMsg"></p>
+  </section>
+
+  <div id="app" class="hidden">
+    <section class="panel stats">
+      <div><div class="big" id="count">–</div><small class="muted">personas inscritas</small></div>
+      <div class="actions">
+        <button id="csv">Descargar inscritos</button>
+        <button id="logout">Salir</button>
+      </div>
+    </section>
+
+    <h2>Premios por sortear</h2>
+    <section class="panel" id="pending"><p class="muted">Cargando...</p></section>
+
+    <h2>Agregar premio</h2>
+    <form class="panel" id="addForm">
+      <label>Nombre del premio
+        <input id="pName" placeholder="Audífonos inalámbricos" required>
+      </label>
+      <div class="row2">
+        <label>Foto
+          <input id="pImg" placeholder="audifonos.jpg o https://...">
+        </label>
+        <label>Orden
+          <input id="pPos" type="number" inputmode="numeric" value="1">
+        </label>
+      </div>
+      <p class="hint">Si subiste la foto a la carpeta public/premios del repositorio, escribe solo el nombre del archivo. El orden define cuál se sortea primero.</p>
+      <button class="primary" type="submit">Agregar premio</button>
+      <p class="msg" id="addMsg"></p>
+    </form>
+
+    <h2>Ya sorteados</h2>
+    <section class="panel" id="drawn"><p class="muted">Aún no hay premios sorteados.</p></section>
+  </div>
+</main>
+
+<section class="stage" id="stage" aria-live="polite">
+  <p class="prize-name" id="sPrize"></p>
+  <div class="spinner" id="sSpin">3</div>
+  <div class="hidden" id="sResult">
+    <span class="ticket" id="sTicket"></span>
+    <div class="winner" id="sWinner"></div>
+    <p class="meta" id="sMeta"></p>
+    <div class="actions" style="justify-content:center">
+      <button id="sShow">Ver datos de contacto</button>
+      <button class="primary" id="sClose">Volver al panel</button>
+    </div>
+    <p class="private" id="sPrivate"></p>
+  </div>
+</section>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let KEY = '';
+  try { KEY = localStorage.getItem('nef_admin_key') || ''; } catch {}
+
+  const imgUrl = v => !v ? '' : (/^https?:\/\//.test(v) ? v : '/premios/' + encodeURIComponent(v));
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY, ...(opts.headers || {}) }
+    });
+    if (res.status === 401) { showLogin('La clave no es correcta.'); throw new Error('401'); }
+    return res;
+  }
+
+  function showLogin(msg) {
+    $('app').classList.add('hidden');
+    $('login').classList.remove('hidden');
+    $('loginMsg').textContent = msg || '';
+  }
+
+  async function load() {
+    const res = await api('/api/free/admin/summary');
+    const data = await res.json();
+    if (!res.ok) { $('pending').innerHTML = `<p class="msg">${esc(data.error)}</p>`; return; }
+    $('login').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    $('count').textContent = data.entries;
+
+    const pending = data.prizes.filter(p => p.status === 'pending');
+    const drawn = data.prizes.filter(p => p.status === 'drawn');
+
+    $('pending').innerHTML = pending.length ? pending.map(p => `
+      <div class="prize">
+        ${p.image_url ? `<img src="${esc(imgUrl(p.image_url))}" alt="">` : '<div class="noimg">🎁</div>'}
+        <div>
+          <b>${esc(p.name)}</b><small>Orden ${p.position}</small>
+          <div class="actions">
+            <button class="draw" data-draw="${p.id}" data-name="${esc(p.name)}">Sortear</button>
+            <button data-remove="${p.id}">Quitar</button>
+          </div>
+        </div>
+      </div>`).join('') : '<p class="muted">No hay premios por sortear. Agrega uno abajo.</p>';
+
+    $('drawn').innerHTML = drawn.length ? drawn.map(p => `
+      <div class="prize">
+        ${p.image_url ? `<img src="${esc(imgUrl(p.image_url))}" alt="">` : '<div class="noimg">🏆</div>'}
+        <div>
+          <b>${esc(p.name)}</b>
+          <small>Ganó ${esc(p.winner_name)} · ${new Date(p.drawn_at).toLocaleString('es-PE', { timeZone: 'America/Lima' })}</small>
+          <div class="actions"><button data-contact="${p.id}">Ver contacto</button></div>
+          <div class="contact" id="c${p.id}">${esc(p.winner_email)} · ${esc(p.winner_phone)}${p.winner_tiktok ? ' · TikTok @' + esc(p.winner_tiktok) : ''}${p.winner_instagram ? ' · IG @' + esc(p.winner_instagram) : ''}</div>
+        </div>
+      </div>`).join('') : '<p class="muted">Aún no hay premios sorteados.</p>';
+  }
+
+  $('enter').addEventListener('click', () => {
+    KEY = $('key').value.trim();
+    try { localStorage.setItem('nef_admin_key', KEY); } catch {}
+    load().catch(() => {});
+  });
+  $('logout').addEventListener('click', () => {
+    KEY = '';
+    try { localStorage.removeItem('nef_admin_key'); } catch {}
+    showLogin();
+  });
+
+  $('csv').addEventListener('click', async () => {
+    const res = await api('/api/free/admin/entries.csv');
+    if (!res.ok) return;
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'inscritos-nadaesfake.csv' });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+
+  $('addForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('addMsg').className = 'msg'; $('addMsg').textContent = '';
+    const res = await api('/api/free/admin/prizes', {
+      method: 'POST',
+      body: JSON.stringify({ name: $('pName').value, imageUrl: $('pImg').value, position: $('pPos').value })
+    });
+    const data = await res.json();
+    if (!res.ok) { $('addMsg').textContent = data.error; return; }
+    $('addMsg').className = 'msg ok'; $('addMsg').textContent = 'Premio agregado.';
+    $('pName').value = ''; $('pImg').value = '';
+    $('pPos').value = (parseInt($('pPos').value, 10) || 0) + 1;
+    load();
+  });
+
+  document.addEventListener('click', async e => {
+    const t = e.target;
+    if (t.dataset.contact) $('c' + t.dataset.contact).classList.toggle('show');
+    if (t.dataset.remove) {
+      if (!confirm('¿Quitar este premio de la lista?')) return;
+      await api('/api/free/admin/prizes/' + t.dataset.remove, { method: 'DELETE' });
+      load();
+    }
+    if (t.dataset.draw) {
+      if (!confirm(`¿Sortear "${t.dataset.name}" ahora?`)) return;
+      runDraw(t.dataset.draw, t.dataset.name, t);
+    }
+  });
+
+  // Sorteo con cuenta regresiva para la transmisión en vivo
+  async function runDraw(id, name, btn) {
+    btn.disabled = true;
+    $('sPrize').textContent = name;
+    $('sResult').classList.add('hidden');
+    $('sPrivate').classList.remove('show');
+    $('sSpin').classList.remove('hidden');
+    $('stage').classList.add('show');
+
+    const request = api('/api/free/admin/draw', { method: 'POST', body: JSON.stringify({ prizeId: id }) })
+      .then(async r => ({ ok: r.ok, data: await r.json() }));
+
+    for (const n of ['3', '2', '1']) {
+      $('sSpin').textContent = n;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    let out;
+    try { out = await request; } catch { out = { ok: false, data: { error: 'Se perdió la conexión.' } }; }
+    $('sSpin').classList.add('hidden');
+    $('sResult').classList.remove('hidden');
+
+    if (!out.ok) {
+      $('sTicket').textContent = 'No se pudo sortear';
+      $('sWinner').textContent = '';
+      $('sMeta').textContent = out.data.error || 'Intenta de nuevo.';
+      $('sShow').classList.add('hidden');
+    } else {
+      const d = out.data;
+      $('sTicket').textContent = `Número ganador: ${d.winningNumber} de ${d.participants}`;
+      $('sWinner').textContent = d.winner.shortName;
+      $('sMeta').textContent = '¡Felicidades! Te escribiremos por WhatsApp.';
+      $('sPrivate').textContent = [d.winner.name, d.winner.email, d.winner.phone,
+        d.winner.tiktok && 'TikTok @' + d.winner.tiktok, d.winner.instagram && 'IG @' + d.winner.instagram].filter(Boolean).join(' · ');
+      $('sShow').classList.remove('hidden');
+    }
+  }
+
+  $('sShow').addEventListener('click', () => $('sPrivate').classList.toggle('show'));
+  $('sClose').addEventListener('click', () => { $('stage').classList.remove('show'); load(); });
+
+  if (KEY) load().catch(() => {}); else showLogin();
+})();
+</script>
+</body>
+</html>
